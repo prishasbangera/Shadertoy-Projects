@@ -14,12 +14,16 @@ I posted a lot of these projects on my Instagram (@prishainabox), which contains
 # Gallery
 - Awkward Mushroom ![Raymarching - 3D Mushroom](image.png) \
 - Equilibrium ![Raymarching - 3D Fishing Bouy in Water](image-1.png) \
+- Lawless Fantary ![Raymarching - Lawless Fantasy](image-11.png)
 - Gogble ![Raymarching - 3D Animated Shape](image-2.png) \
 - Winter Denoument ![Raymarching - Terrain scene](image-3.png) \
-- Code Cake ![Raymarching - Cake](image-4.png)
-- Learning Again ![Raymarching Basic Scenne](image-5.png)
-- Randomness + Truchet Tiles ![2d random truchet tile pattern](image-6.png)
-- Swirly Swirls ![Raymarching - Swirly Swirls](image-7.png)
+- Code Cake ![Raymarching - Cake](image-4.png) \
+- Learning Again ![Raymarching Basic Scenne](image-5.png) \
+- Randomness + Truchet Tiles ![2d random truchet tile pattern](image-6.png) \
+- Swirly Swirls ![Raymarching - Swirly Swirls](image-7.png) \
+- Donut Sandwich ![Raymarching - Donut Sandwich](image-8.png) \
+- No Basis In Reality ![Raymarching - Noisy Planet](image-9.png) \
+- Ancient Temple (Following Tutorial) ![Raymarching - Ancient Temple](image-10.png)
 
 ## Notes:
 - As I had not learned about college-level coding standards when creating most of the projects, the code is extremely messy. Please let me know if anything is confusing.
