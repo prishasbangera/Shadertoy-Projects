@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html>
+
+    <!--
+      Project Name
+      Date
+      Prisha B.
+      Click to pause/play.
+
+      Template Link: https://www.khanacademy.org/computer-programming/shader-template/5853997202718720
+    -->
+    
+    <head>
+      <meta charset="utf-8">
+      <title>Shader Template</title>
+      <meta name="viewport" content="width=device-width">
+      <style>
+        body {
+          background-color: black;
+        	margin: 0px;
+        	overflow: hidden;
+        }
+        #canvas {
+        	position: absolute;
+        	top: 0px;
+        	bottom: 0px;
+        	left: 0px;
+        	right: 0px;
+        	margin: auto;
+        }
+      </style>
+      <script type="">
+        
+        function resizeCanvas(gl, resolutionUniLoc, w = 400, h = 400) {
+        	if (gl.canvas.width !== w ||
+        		  gl.canvas.height !== h) {
+        		// size canvas to w, h
+        		gl.canvas.width = w;
+        		gl.canvas.height = h;
+        		// set viewport
+        		gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+        		// pass in resolution
+        		gl.uniform2fv(resolutionUniLoc, [gl.canvas.width, gl.canvas.height]);
+        	}
+        }
+        
+        // get webgl2 context
+        function getWEBGL2(canvas) {
+        	const gl = canvas.getContext("webgl2", {
+      	    antialias: false,
+  	        preserveDrawingBuffer: true,
+  	        premultipliedAlpha: false
+        	});
+        	if (gl)
+        		return gl;
+        	else console.log("No WebGL2 for you! :(((");
+        }
+        
+        function createShader(gl, srcId, replaceStrings) {
+        	// get source
+        	const scriptTag = document.getElementById(srcId)
+        	let source = scriptTag.text;
+        	if (!source) {
+        		console.log("Unknown script element.");
+        		return;
+        	}
+        	// replace strings
+        	for (let strng in replaceStrings) {
+        		source = source.replaceAll(strng, replaceStrings[strng]);
+        	}
+        	// get type of source
+        	let type;
+        	if (scriptTag.type === "x-shader/x-vertex") {
+        		type = gl.VERTEX_SHADER;
+        	} else if (scriptTag.type === "x-shader/x-fragment") {
+        		type = gl.FRAGMENT_SHADER;
+        	} else {
+        		console.log("Wrong type for script tag.");
+        		return;
+        	}
+        	// create shader, set source code, and compile
+        	const shader = gl.createShader(type);
+        	gl.shaderSource(shader, source);
+        	gl.compileShader(shader);
+        	// check if success
+        	if (gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        		return shader;
+        	} else {
+        		// log error and delete shader
+        		console.log(gl.getShaderInfoLog(shader));
+        		gl.deleteShader(shader);
+        	}
+        }
+        
+        // link two shaders into a program
+        function createProgram(gl, vsId, fsId, replaceStrings = {}) {
+        	const program = gl.createProgram();
+        	// create and attach shaders
+        	const vShader = createShader(gl, vsId, replaceStrings);
+        	const fShader = createShader(gl, fsId, replaceStrings);
+        	gl.attachShader(program, vShader);
+        	gl.attachShader(program, fShader);
+        	// link and validate
+        	gl.linkProgram(program);
+        	gl.validateProgram(program);
+        	// check
+        	if (gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        		return program;
+        	} else {
+        		// log error and delete program
+        		console.log(gl.getProgramInfoLog(program));
+        		gl.deleteProgram(program);
+        	}
+        }
+        
+        function attribute(gl, program, name, size, type, normalize, stride = 0, offset = 0) {
+        	const location = gl.getAttribLocation(program, name);
+        	gl.enableVertexAttribArray(location);
+        	gl.vertexAttribPointer(location, size, type, normalize, stride, offset);
+        	return location;
+        }
+        
+        function buffer(gl, target, data, usage) {
+        	const b = gl.createBuffer();
+        	gl.bindBuffer(target, b);
+        	gl.bufferData(target, data, usage);
+        
+        	return b;
+        }
+        
+        function programLog(gl, program) {
+        	const log = gl.getProgramInfoLog(program);
+        	if (log.length > 0) {
+        		console.log(log);
+        		return true;
+        	}
+        }
+        
+		  </script>
+    </head>
+    <body>
+    
+	    <canvas id="canvas"></canvas>
+		  
+	    <!--Vertex Shader-->
+	    <script id="vs" type="x-shader/x-vertex">#version 300 es
+        in vec4 a_position;
+        void main() {
+        	gl_Position = a_position;
+        }
+	    </script>
+		  
+	    <!--Fragment Shader-->
+      <script id="fs" type="x-shader/x-fragment">#version 300 es
+
+precision highp float;
+
+uniform vec2 u_resolution;
+uniform float u_time;
+
+out vec4 fragColor;
+
+void main() {
+
+  vec2 uv = (2.0*gl_FragCoord.xy - u_resolution) / min(u_resolution.x, u_resolution.y);
+  
+  vec3 clr = vec3(cos(uv.x*uv.y), sin(uv.y), sin(u_time + uv.y));
+  clr *= sin(cos(uv.x * 3.0) * cos(uv.y * 3.0) * 20.0 + u_time * 10.0);
+
+  // Output to screen
+  fragColor = vec4(clr, 1.0);
+    
+}
+
+      </script>
+      
+      <!-- Main js -->
+      <script type="">
+      
+        function main() {
+
+        	/**INIT**/
+        	
+        	// get context
+        	const glCanvas = document.getElementById("canvas");
+        	glCanvas.playing = false;
+        	const gl = getWEBGL2(glCanvas);
+        	if (!gl) return;
+        
+        	// create program
+        	const prog = createProgram(gl, "vs", "fs");
+        
+        	// uniform resolution
+        	const resUniLoc = gl.getUniformLocation(prog, "u_resolution");
+        
+        	// time uniform
+        	const timeUniLoc = gl.getUniformLocation(prog, "u_time");
+        
+        	// position buffer
+        	const positions = [
+        		-1, 1, -1, -1, 1, 1,
+        		-1, -1, 1, -1, 1, 1
+        	];
+        	const positionBuffer = buffer(gl, gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+        	// position attribute
+        	const posAttrLoc = attribute(gl, prog, "a_position", 2, gl.FLOAT, false, 0, 0);
+        
+        	// Clear the canvas
+        	gl.clearColor(0, 0, 0, 1);
+        	gl.clear(gl.COLOR_BUFFER_BIT);
+        
+        	// use program
+        	gl.useProgram(prog);
+        
+        	/* DRAW */
+        	
+        	resizeCanvas(gl, resUniLoc, window.innerWidth, window.innerHeight);
+        	let time = 0.0;
+        
+        	// loop
+        	function drawScene() {
+        		// pass in time
+        		gl.uniform1f(timeUniLoc, time);
+        		// draw
+        		gl.drawArrays(gl.TRIANGLES, 0, positions.length / 2);
+        		// log errors -> returns true if error
+        		if (!programLog(gl, prog) && glCanvas.playing) {
+        			time += 0.01;
+        			window.requestAnimationFrame(drawScene);
+        		}
+        	}
+        
+        	glCanvas.addEventListener("click", () => {
+        		glCanvas.playing = !glCanvas.playing;
+        		if (glCanvas.playing)
+        			window.requestAnimationFrame(drawScene);
+        	});
+        
+        	glCanvas.click();
+        
+        }
+        
+        main();
+        
+      </script>
+
+    </body>
+</html>

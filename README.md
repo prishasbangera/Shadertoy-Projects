@@ -6,14 +6,22 @@ My profile can be found [here](https://www.shadertoy.com/profile/?show=shaders).
 I posted a lot of these projects on my Instagram (@prishainabox), which contains a mix of traditional, digital, and creative coding art.
 
 # Folders
-- SHOWCASE
-- Tutorials: Programs that I wrote while being guided by online tutorials (some are in Showcase, however).
-- Two-Dimensional
-- 
+- SHOWCASE: My favorite artworks
+- Two-Dimensional: 2D things not related to ray marching
+- Other Experiments: Random ray marching stuff
+- Following Tutorials: Programs that I wrote while being guided by online tutorials (some are in Showcase, however).
+
+## Notes:
+- As I had not learned about college-level coding standards when creating most of the projects, the code is extremely messy. Please let me know if anything is confusing.
+- I have done my best to include which sources I used when learning. Please let me know if I have missed anything.
+- If you have any suggestions on better ways to showcase and store my code, please let me know.
+- Please forgive (or be amused by) the silly titles if you decide to follow the link to the live programs. :D
 
 # Gallery
+- Infinity Unknown Version 2 ![Raymarching - Infinity Unknown Version 2](image-12.png)
 - Awkward Mushroom ![Raymarching - 3D Mushroom](image.png) \
 - Equilibrium ![Raymarching - 3D Fishing Bouy in Water](image-1.png) \
+- Following Ray Tracing Tutorial ![Ray Tracing](image-13.png)
 - Lawless Fantary ![Raymarching - Lawless Fantasy](image-11.png)
 - Gogble ![Raymarching - 3D Animated Shape](image-2.png) \
 - Winter Denoument ![Raymarching - Terrain scene](image-3.png) \
@@ -24,9 +32,3 @@ I posted a lot of these projects on my Instagram (@prishainabox), which contains
 - Donut Sandwich ![Raymarching - Donut Sandwich](image-8.png) \
 - No Basis In Reality ![Raymarching - Noisy Planet](image-9.png) \
 - Ancient Temple (Following Tutorial) ![Raymarching - Ancient Temple](image-10.png)
-
-## Notes:
-- As I had not learned about college-level coding standards when creating most of the projects, the code is extremely messy. Please let me know if anything is confusing.
-- I have done my best to include which sources I used when learning. PLEASE let me know if I have missed anything.
-- If you have any suggestions on better ways to showcase and store my code, please let me know.
-- Please forgive (or be amused by) the silly titles if you decide to follow the link to the live programs. :D

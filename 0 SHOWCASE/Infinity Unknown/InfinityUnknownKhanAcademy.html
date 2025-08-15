@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html>
+    <head>
+    
+      <!--
+
+        Prisha B.
+        Infinity Unknown
+        
+        Shadertoy: https://www.shadertoy.com/view/NsKXR3
+        
+        2021
+
+      -->
+      
+      <!--
+      
+        Image Texture Sources:
+        - Bricks: https://upload.wikimedia.org/wikipedia/commons/thumb/e/e6/Red_brick_wall_texture.JPG/800px-Red_brick_wall_texture.JPG
+        - Noise: https://upload.wikimedia.org/wikipedia/commons/thumb/9/9a/512x512_Dissolve_Noise_Texture.png/640px-512x512_Dissolve_Noise_Texture.png
+        - Galaxy: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Whirlpool_galaxy.png/640px-Whirlpool_galaxy.png
+       
+        Sources for Learning:
+        - https://thebookofshaders.com/10/
+        - https://www.iquilezles.org/www/articles/smin/smin.htm
+        - https://www.youtube.com/watch?v=62-pRVZuS5c
+        - https://www.iquilezles.org/www/articles/normalsSDF/normalsSDF.htm
+        - https://www.iquilezles.org/www/articles/rmshadows/rmshadows.htm
+        - https://www.shadertoy.com/view/3lsSzf
+        - https://www.iquilezles.org/www/articles/fog/fog.htm
+        - https://www.youtube.com/watch?v=Cfe5UQ-1L9Q
+        - https://learnopengl.com/Getting-started/Camera
+      
+      -->
+      
+      <meta charset="utf-8">
+      <title>Infinity Unknown</title>
+      <meta name="viewport" content="width=device-width">
+      
+      <!-- Styling -->
+      <style>
+        /* black background*/
+        body {
+          background-color: black;
+        	margin: 0px;
+        	overflow: hidden;
+        }
+        /* links */
+        a {
+          color: rgb(255, 255, 255, 60%);
+          text-decoration: none;
+          font-family: sans-serif;
+          font-size: 15px;
+        }
+        a:hover {
+          color: rgb(255, 255, 255, 80%);
+        }
+        /* canvas and link, centered */
+        #canvas {
+        	position: absolute;
+        	/* center canvas */
+        	top: 0px;
+        	bottom: 0px;
+        	left: 0px;
+        	right: 0px;
+        	margin: auto;
+        }
+      </style>
+      
+      <!-- Helper Functions -->
+      <script type="">
+        
+        // resize webgl canvas to correct dimensions
+        // and pass resolution to shader
+        // pass in gl context, uniform location, width and height
+        function resizeCanvas(gl, resolutionUniLoc, w = 400, h = 400) {
+        	if (gl.canvas.width !== w ||
+        		  gl.canvas.height !== h) {
+        		// size canvas to w, h
+        		gl.canvas.width = w;
+        		gl.canvas.height = h;
+        		// set viewport
+        		gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+        		// pass in resolution
+        		gl.uniform2fv(resolutionUniLoc, [gl.canvas.width, gl.canvas.height]);
+        	}
+        }
+        
+        // get webgl2 context, pass in canvas
+        function getWEBGL2(canvas) {
+        	const gl = canvas.getContext("webgl2");
+        	if (gl) return gl;
+        	else alert("No WebGL2 for you! D:");
+        }
+        
+        // function to create shader (is called by createProgram)
+        // pass in gl context, id of script tag
+        // pass in object of strings you want to replace
+        // example of above: replace PI in shader with 3.14
+        function createShader(gl, srcId, replaceStrings) {
+          
+        	// get source
+        	const scriptTag = document.getElementById(srcId)
+        	let source = scriptTag.text;
+        	if (!source) {
+        		console.log("Unknown script element.");
+        		return;
+        	}
+        	
+        	// replace strings
+        	for (let strng in replaceStrings) {
+        		source = source.replaceAll(strng, replaceStrings[strng]);
+        	}
+        	
+        	// get type of source
+        	let type;
+        	if (scriptTag.type === "x-shader/x-vertex") {
+        		type = gl.VERTEX_SHADER;
+        	} else if (scriptTag.type === "x-shader/x-fragment") {
+        		type = gl.FRAGMENT_SHADER;
+        	} else {
+        		console.log("Wrong type for script tag.");
+        		return;
+        	}
+        	
+        	// create shader, set source code, and compile
+        	const shader = gl.createShader(type);
+        	gl.shaderSource(shader, source);
+        	gl.compileShader(shader);
+        	
+        	// check if success
+        	if (gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        		return shader;
+        	} else {
+        		// log error and delete shader
+        		console.log(gl.getShaderInfoLog(shader));
+        		gl.deleteShader(shader);
+        	}
+        	
+        }
+        
+        // link two shaders into a program
+        // pass in gl context, vertex shader id, fragment shader id
+        // optional: pass in object of strings you want to replace
+        // example: replace PI in shader with 3.14
+        function createProgram(gl, vsId, fsId, replaceStrings = {}) {
+          
+        	const program = gl.createProgram();
+        	
+        	// create and attach shaders
+        	const vShader = createShader(gl, vsId, replaceStrings);
+        	const fShader = createShader(gl, fsId, replaceStrings);
+        	gl.attachShader(program, vShader);
+        	gl.attachShader(program, fShader);
+        	
+        	// link and validate
+        	gl.linkProgram(program);
+        	gl.validateProgram(program);
+        	
+        	// check
+        	if (gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        		return program;
+        	} else {
+        		// log error and delete program
+        		console.log(gl.getProgramInfoLog(program));
+        		gl.deleteProgram(program);
+        	}
+        	
+        }
+        
+        // set up attribute
+        // attributes get info from buffer
+        /* 
+          PARAMS:
+          - pass in gl context and program
+          - name: name of attribute in shader
+          - size: specify how to pull the data out
+              2 components per iteration (must be 1, 2, 3, or 4)
+          - type: either FLOAT, BYTE (8bitint), SHORT (16bitint),   
+              UNSIGNED_BYTE, etc. 
+          - normalize: boolean
+              specifies whether INTEGER data values should be
+              normalized into a certain range when being cast to float
+	            BYTE and SHORT normalizes to [-1,1] if true
+              UNSIGNED_BYTE and UNSIGNED_SHORT normalize to [0,1]
+              FLOAT -> no effect
+          - stride: 0 = move forward size * sizeof(type) each
+                iteration to get the next position
+	              is offset in bytes between the beginning 
+	              of consecutive vertex attributes
+	        - offset: where to start in buffer (0 is beginning)
+	        
+        */
+        function attribute(gl, program, name, size, type, normalize, stride = 0, offset = 0) {
+          
+          // get location of attribute
+        	const location = gl.getAttribLocation(program, name);
+        	
+        	// turn attribute on, tells WebGL to get data out of buffer
+        	gl.enableVertexAttribArray(location);
+        	
+        	// specify what order the attribs are stored, what data type they are in
+	        // binds the current ARRAY_BUFFER to the attribute
+        	gl.vertexAttribPointer(location, size, type, normalize, stride, offset);
+        	
+        	return location;
+        	
+        }
+        
+        // sets up a buffer
+        // pass in gl context, target (gl.ARRAY_BUFFER, etc.), buffer data (Float32Array, etc.), usage (gl.STATIC_DRAW, etc.) 
+        function buffer(gl, target, data, usage) {
+        	const b = gl.createBuffer();
+        	// bind points: internal global variables inside WebGL
+        	gl.bindBuffer(target, b);		
+        	// put data in buffer by referencing through bind point
+        	gl.bufferData(target, data, usage);
+        	return b;
+        }
+        
+        // set up texture
+        // pass in gl context, filter and wrap mode, 
+        // unit (number), and image pixels
+        function texture(gl, filter, wrap, unit, image) {
+        
+        	const texture = gl.createTexture();
+        	// make unit the active texture uint
+	        // (the unit all other texture commands will affect)
+					gl.activeTexture(gl.TEXTURE0 + unit);
+					// Bind it to texture unit's 2D bind point
+        	gl.bindTexture(gl.TEXTURE_2D, texture);
+        
+        	// options for texture
+        	// wrap
+        	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap);
+        	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap);
+        	// filter
+        	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
+        	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
+
+					// upload the image into the texture
+					gl.texImage2D(
+						gl.TEXTURE_2D, // target / bind point
+						0, // mip level
+						gl.RGBA, // internal format
+						gl.RGBA, // source format
+						gl.UNSIGNED_BYTE, // source type
+						image // pixels
+					);
+        
+        	return texture;
+        	
+        }
+        
+        // logs errors, returns true if there's an error
+        // pass in gl context and program
+        function programLog(gl, program) {
+        	const log = gl.getProgramInfoLog(program);
+        	if (log.length > 0) {
+        		console.log(log);
+        		return true;
+        	}
+        }
+        
+		  </script>
+		  
+    </head>
+    <body>
+    
+      <!-- canvas 2d context -->
+		  <canvas id="canvas"></canvas>
+		  
+		  <!--Vertex Shader-->
+		  <script id="vs" type="x-shader/x-vertex">#version 300 es
+		    // fragment shader determines clr of every pixel
+        in vec4 a_position;
+        void main() {
+        	gl_Position = a_position;
+        }
+		  </script>
+		  
+		  <!--Fragment Shader-->
+		  <script id="fs" type="x-shader/x-fragment">#version 300 es
+
+precision highp float;
+
+uniform vec2 u_resolution;
+uniform sampler2D u_brickTexture;
+uniform sampler2D u_noiseTexture;
+uniform sampler2D u_skyTexture;
+
+const float EPSILON = 0.001;
+const float MAX_DIST = 70.0;
+
+// output
+out vec4 fragColor;
+
+//*******************************************************//
+
+// Light struct
+struct Light {
+  vec3 clr; // color
+  vec3 dir; // direction
+  float shadowSoftness; // higher number -> harder shadows
+};
+
+// Material structure
+struct Material {
+  vec3 clr;
+  float amb; // ambient
+  float dif; // diffuse
+  float spec; // specular
+  float shininess;
+  float id; // identification for effects in calcClr
+};
+
+// function to return a default material
+Material defaultMaterial() {
+  Material mat;
+  mat.amb = 0.1;
+  mat.clr = vec3(0.05);
+  mat.dif = 1.0;
+  mat.spec = 1.0;
+  mat.shininess = 10.0;
+  mat.id = -1.0;
+  return mat;
+}
+
+//*******************************************************//
+
+// clamp value from 0 to 1
+float uclamp(float val) {
+  return clamp(val, 0.0, 1.0);
+}
+
+//*******************************************************//
+
+// random value from 0 to 1
+// https://thebookofshaders.com/10/
+float random(in vec2 v) {
+  return fract(15465.1327854 * sin(dot(v, vec2(173.93422, 102.5165))));
+}
+
+//*******************************************************//
+
+// https://www.iquilezles.org/www/articles/smin/smin.htm
+
+// smooth min
+float smoothmin(in float a, in float b, in float k) {
+  float h = clamp(0.5+0.5*(b-a)/k, 0.0, 1.0);
+  return mix(b, a, h) - k*h*(1.0-h);
+}
+
+// smooth max
+float smoothmax( float a, float b, float k ) {
+  float h = max(k-abs(a-b),0.0);
+  return max(a, b) + h*h*0.25/k;
+}
+
+// Smooth min for distance and color
+// returns rgb and d in vec4
+vec4 smoothmin(in float a, in float b, in vec3 clr1, in vec3 clr2, in float k) {
+
+ float h = clamp(0.5+0.5*(b-a)/k, 0.0, 1.0);
+   
+ // distance
+ float d = mix(b, a, h) - k*h*(1.0-h);
+ // color
+ vec3 c = mix(clr2, clr1, smoothstep(0.0, 1.0, h));
+ 
+ return vec4(c, d);
+   
+}
+
+//*******************************************************//
+
+// SDFs
+
+// SDF box
+// https://www.youtube.com/watch?v=62-pRVZuS5c
+float sdBox(vec3 pt, vec3 b) {
+	vec3 q = abs(pt) - b;
+	return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
+}
+
+//*******************************************************//
+
+// MAIN SDF
+
+float sdf(in vec3 pt, out Material mat) {
+
+  // defaults
+  mat = defaultMaterial();
+  
+  // distance to closest object
+  float res;
+
+	// path
+  vec3 pathClr;
+  float path;
+	float pathX = sin(pt.z) + 7.0*smoothstep(3.0, -25.0, pt.z) - 0.3;
+  {
+  
+    // path clr
+    pathClr = vec3(0.16, 0.16, 0.09);
+    pathClr.rgb += texture(u_brickTexture, vec2(pt.z-1.0, pt.x - sin(pt.z)) * 0.2).rgb * 0.15 * vec3(1, 1, 0.9);
+
+    // path shape -> distort x by z value of pt
+    path = sdBox(
+        pt - vec3(pathX, -2.2, 0), 
+        vec3(2.5, 0.15, 40.0)
+    ) - 0.01;
+    // distort by texture (bricks)
+    path -= pathClr.r * (0.15 + 0.3 * smoothstep(-2.0, 10.0, pt.z));
+		path += 0.05 * (pathClr.r + pathClr.g + pathClr.g);
+     
+  }
+  
+  // sand
+  vec3 sandClr;
+  float sand;
+  {
+  
+    // sand clr
+    sandClr = vec3(0.14, 0.14, 0.08) * 0.7;
+    sandClr.rg += random(pt.xz*10.9)*0.05;
+    sand = pt.y + 2.3;
+   
+    // mountain range
+    float h = 3.0 + 1.3*texture(u_noiseTexture, pt.xz*0.001).r - smoothstep(0.0,-40.0, pt.z); 
+    sand -= h*smoothstep(4.0, 27.0, abs(pt.x-pathX))*(0.9*sin(pt.z*0.4-0.5)+0.9)*smoothstep(8.0, 18.0, length(pt));
+    
+    // plane distortion by texture -> "sand"
+    sand += (0.25*texture(u_noiseTexture, pt.xz*0.01).r + 0.08*texture(u_noiseTexture, pt.xz*0.02).r) * smoothstep(2.0, 2.5, abs(pt.x - pathX));
+      
+  }
+
+  // blend distance and clr (sand and path)
+  vec4 blend = smoothmin(sand, path, sandClr, pathClr, 0.8);
+  res = blend.w;
+
+  // material
+  mat.clr = blend.rgb;
+  mat.id = 0.0;
+  mat.shininess = 10.0;
+  mat.spec = 0.2;
+
+  return res;
+    
+}
+
+//*******************************************************//
+
+// https://www.iquilezles.org/www/articles/normalsSDF/normalsSDF.htm
+vec3 calcNormal(in vec3 pt) {
+  vec2 h = vec2(EPSILON, 0);
+  Material m;
+  // central difference sdf(pt + EPSILON) - sdf(pt - EPSILON)    
+  return normalize(vec3(
+    sdf(pt + h.xyy, m) - sdf(pt - h.xyy, m),
+    sdf(pt + h.yxy, m) - sdf(pt - h.yxy, m),
+    sdf(pt + h.yyx, m) - sdf(pt - h.yyx, m)
+  ));
+}
+
+//*******************************************************//
+
+// cast a ray to the scene and return closest object dist and material
+float castRay(in vec3 ro, in vec3 rd, out Material mat) {
+
+  // total distance traveled
+  float td = 0.0;
+  
+  for (int i = 0; i < 256; i++) {
+    float h = sdf(ro + td*rd, mat);
+    // if distance is really close, break
+    if (abs(h) < (0.0001*td)) break;
+    // add to total distance
+    td += h;
+    // if too far, break
+    if (td >= MAX_DIST) {
+        mat.id = -1.0;
+        break;
+    }
+  }
+  
+  return td;
+    
+}
+
+// https://www.iquilezles.org/www/articles/rmshadows/rmshadows.htm
+float softShadow(in vec3 ro, in vec3 rd, in float k) {
+
+  float res = 1.0; // result
+  float td = 0.05; // total distance traveled
+  
+  for (int i = 0; i < 256 && td < MAX_DIST; i++) {
+    Material m;
+    float d = sdf(ro + td*rd, m);
+    if (d < 0.001) {
+      // intersection, so return shadow
+      return 0.0;
+    }
+    res = min(res, k*d/td);
+    td += d;
+  }
+  
+  // if no intersection -> shadow 0.0 to light 1.0
+  return res;
+    
+}
+
+// https://www.shadertoy.com/view/3lsSzf
+// ambient occlusion
+float calcOcc(in vec3 pt, in vec3 nor) {
+
+  float occ = 0.0;
+  float scl = 1.0;
+  
+  Material m; // placeholder
+  
+  for (int i = 0; i < 4; i++) {
+    float h = 0.01 + 0.11 * 0.25 * float(i);
+    float d = sdf(pt + h * nor, m);
+    occ += (h-d)*scl;
+    scl *= 0.95;
+  }
+  
+  return uclamp(1.0 - 2.0 * occ);
+    
+}
+
+//*******************************************************//
+
+// https://www.iquilezles.org/www/articles/fog/fog.htm
+vec3 applyFog(in vec3 rd, in float d, in vec3 clr, in vec3 sunClr, in vec3 sunDir, in vec3 skyClr) {
+    
+  // mix sun clr with sky clr to get fog clr
+  vec3 fogClr = mix( skyClr, sunClr, pow(max(dot(rd, sunDir), 0.0), 15.0) );
+    
+  // mix pixel clr with fog clr
+  return mix(clr, fogClr, 1.0 - exp(-0.0015 * d * d)); // fog
+    
+}
+
+vec3 calcLighting(in vec3 pt, in vec3 rd, in vec3 nor, in Light light, in Material mat) {
+    
+  // diffuse
+  float dif = uclamp(dot(nor, light.dir)) * mat.dif;
+  
+  // shadow
+  float shadow = softShadow(pt, light.dir, light.shadowSoftness);
+  
+  // specular
+  vec3 ref = reflect(light.dir, nor);
+  float spec = pow(uclamp(dot(rd, ref)), mat.shininess) * mat.spec;
+
+  return light.clr * shadow * dif * (spec + 1.0);
+    
+}
+
+vec3 calcClr(in vec2 uv, in vec3 ro, in vec3 rd, in float d, in vec3 nor, in Material mat) {
+
+  // from camera to point in scene
+  vec3 pt = ro + rd * d;
+
+  // SKY CLR
+  vec3 skyClr = vec3(1.2, 0.65, 0.7);
+  skyClr -= 0.5*smoothstep(0.3, 2.0, uv.y);
+  
+  // KEY LIGHT
+  Light sun;
+  sun.clr = vec3(0.9, 0.8, 0.4) * 4.5;
+  sun.dir = normalize(vec3(0.8, 0.2, -0.4));
+  sun.shadowSoftness = 20.0;
+  
+  // background color
+  vec3 shine = sun.clr*0.2 * pow(max(dot(sun.dir, rd), 0.0), 30.0);
+  
+  // return background if too far (id is -1.0)
+  if (mat.id == -1.0) {
+		// texture coordinates
+		vec2 texCoord = (uv*vec2(0.5, -0.5) + 1.0)*0.5;
+		// sky texture
+		vec3 skyTex = texture(u_skyTexture, texCoord).rgb;
+		// fade based on height
+		skyTex *= smoothstep(1.5, -0.5, uv.y);
+		skyClr += 0.25*skyTex;
+    // return sky
+    return skyClr + shine;
+  }
+  
+  // material id is not -1.0, so we hit an obj
+  vec3 clr = mat.clr;
+  
+  // CALCULATE COLOR
+  float occ = calcOcc(pt, nor); // ambient occlusion
+  vec3 light = vec3(mat.amb); // ambient
+  light += calcLighting(pt, rd, nor, sun, mat) * occ; // sun
+  light += uclamp(dot(nor, vec3(0,  1, 0))) *  skyClr * occ; // sky diffuse
+  clr *= light;
+  
+  // apply fog
+  clr = applyFog(rd, d, clr, sun.clr * 0.25, sun.dir, skyClr);
+  
+  return clr + shine;
+
+}
+
+//*******************************************************//
+
+vec3 render(in vec2 uv, in vec3 ro, in vec3 rd) {
+    
+  // material and clr
+  Material mat;
+  vec3 clr = vec3(0);
+
+  // get distance to point
+  float d = castRay(ro, rd, mat);
+  // surface normal
+  vec3 nor = calcNormal(ro + rd*d);
+  
+  // calculate the color of the pixel
+  clr = calcClr(uv, ro, rd, d, nor, mat);
+  
+  // gamma correction
+  clr = pow(clr, vec3(1.0 / 2.2)); 
+  
+  return clr;
+    
+}
+
+//*******************************************************//
+
+// https://www.youtube.com/watch?v=Cfe5UQ-1L9Q
+// https://learnopengl.com/Getting-started/Camera
+vec3 setCamera(in vec2 uv, in vec3 ro, in vec3 target) {
+
+  vec3 forward = normalize(target - ro);
+  vec3 right = normalize(cross(forward, vec3(0, 1, 0)));
+  vec3 up = normalize(cross(right, forward));
+  
+  // ray direction
+  vec3 rd = normalize(uv.x * right + uv.y * up + 1.2 * forward);
+  
+  return rd;
+    
+}
+
+void main() {
+  
+  // Normalized pixel coordinates
+  vec2 uv = (2.0*gl_FragCoord.xy - u_resolution) / min(u_resolution.x, u_resolution.y);
+  
+  // target
+  vec3 target = vec3(0, -0.3, 0);
+  // ray origin
+  vec3 ro = vec3(0.0, 0.05, 8.0);
+  
+  // set camera
+  vec3 rd = setCamera(uv, ro, target);
+  
+  // calculate color using raymarching
+  vec3 clr = render(uv, ro, rd);
+
+  // Output to screen
+  fragColor = vec4(clr, 1.0);
+  
+}
+
+      </script>
+      
+      <!-- Main js -->
+      <script type="">
+
+        // LOADING IMAGES
+        
+				var brickTextureImg = new Image();
+				// computing noise is expensive, so using a texture
+				var noiseTextureImg = new Image();
+				var skyTextureImg = new Image();
+				
+				var images = [brickTextureImg, noiseTextureImg, skyTextureImg];
+
+        // load image textures from wikimedia
+				window.addEventListener("load", function () {
+
+					brickTextureImg.src = "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e6/Red_brick_wall_texture.JPG/800px-Red_brick_wall_texture.JPG";
+
+					noiseTextureImg.src = "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9a/512x512_Dissolve_Noise_Texture.png/640px-512x512_Dissolve_Noise_Texture.png";
+
+					skyTextureImg.src = "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Whirlpool_galaxy.png/640px-Whirlpool_galaxy.png";
+
+					images.forEach(img => img.crossOrigin = "");
+
+					let imagesLoaded = 0;
+					// increment counter on image load
+					images.forEach(img => {
+						img.addEventListener("load", () => {
+							imagesLoaded++;
+							// if all images are loaded, call main function
+							if (imagesLoaded === images.length) main();
+						});
+					});
+
+				});
+      
+        function main() {
+
+        	/**INIT**/
+        	
+        	// canvas width and height
+        	const width = 600;
+        	const height = 450;
+        	
+        	// check canvas size
+        	if (window.innerWidth < width || window.innerHeight < height) {
+        	  // create a link to see w/ correct canvas size
+        	  const a = document.createElement("a");
+        	  a.target = "_blank";
+        	  a.href = "https://www.khanacademy.org/computer-programming/-/5378626088386560?width="+width+"&height="+height;
+        	  a.textContent = "Click here to view canvas in correct size."
+        	  // append the link to body
+        	  document.body.appendChild(a); 
+        	  
+        	  // do not draw the canvas
+        	  return;
+        	  
+        	}
+        	
+        	// create canvas, get context webgl
+        	const glCanvas = document.createElement("canvas");
+        	const gl = getWEBGL2(glCanvas);
+        	if (!gl) return;
+        
+        	// create program
+        	const prog = createProgram(gl, "vs", "fs");
+        
+        	// uniform resolution
+        	const resUniLoc = gl.getUniformLocation(prog, "u_resolution");
+        
+        	// image uniforms
+					const brickImgLoc = gl.getUniformLocation(prog, "u_brickTexture");
+					const noiseImgLoc =  gl.getUniformLocation(prog, "u_noiseTexture");
+					const skyImgLoc =  gl.getUniformLocation(prog, "u_skyTexture");
+        
+        	// position buffer
+        	// two triangles, cover entire canvas
+        	const positions = [
+        		-1, 1, -1, -1, 1, 1,
+        		-1, -1, 1, -1, 1, 1
+        	];
+        	const positionBuffer = buffer(gl, gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+        	// position attribute
+        	const posAttrLoc = attribute(gl, prog, "a_position", 2, gl.FLOAT, false, 0, 0);
+
+					// textures
+					const brickTexture = texture(gl, gl.LINEAR, gl.REPEAT, 0, brickTextureImg);
+					const noiseTexture = texture(gl, gl.LINEAR, gl.REPEAT, 1, noiseTextureImg);
+					const skyTexture = texture(gl, gl.LINEAR, gl.REPEAT, 2, skyTextureImg);
+        
+        	// Clear the canvas
+        	gl.clearColor(0, 0, 0, 1);
+        	gl.clear(gl.COLOR_BUFFER_BIT);
+        
+        	// use program
+        	gl.useProgram(prog);
+        	
+        	// resize canvas
+        	resizeCanvas(gl, resUniLoc, width, height);  
+        	
+        	// create 2d canvas
+        	const canvas2d = document.getElementById("canvas");
+        	canvas2d.width = glCanvas.width;
+        	canvas2d.height = glCanvas.height;
+        	const ctx2d = canvas2d.getContext("2d");
+
+					// Tell shader to get brick texture from unit 0
+					gl.uniform1i(brickImgLoc, 0);
+					// Tell shader to get noise texture from unit 1
+					gl.uniform1i(noiseImgLoc, 1);
+					// Tell the shader to get the sky texture from texture unit 2
+					gl.uniform1i(skyImgLoc, 2);
+
+          /** DRAW **/
+          
+      		// draw
+      		gl.drawArrays(gl.TRIANGLES, 0, positions.length / 2);
+        	// paint webgl canvas onto 2d canvas so that thumbnail saves
+          ctx2d.drawImage(glCanvas, 0, 0, glCanvas.width, glCanvas.height);
+      		// log errors
+      		programLog(gl, prog);
+        
+        }
+        
+      </script>
+      
+    </body>
+</html>
