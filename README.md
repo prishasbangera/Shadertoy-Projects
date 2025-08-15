@@ -19,6 +19,7 @@ I posted a lot of these projects on my Instagram (@prishainabox), which contains
 - Code Cake ![Raymarching - Cake](image-4.png)
 - Learning Again ![Raymarching Basic Scenne](image-5.png)
 - Randomness + Truchet Tiles ![2d random truchet tile pattern](image-6.png)
+- Swirly Swirls ![Raymarching - Swirly Swirls](image-7.png)
 
 ## Notes:
 - As I had not learned about college-level coding standards when creating most of the projects, the code is extremely messy. Please let me know if anything is confusing.
